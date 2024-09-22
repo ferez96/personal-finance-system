@@ -1,102 +1,220 @@
 
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <title>Edit Document</title>
-    <!-- Bootstrap CSS -->
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <style>
-        /* Additional styles */
-        .paragraph {
-            cursor: pointer;
-        }
-        .selected {
-            background-color: #d3d3d3;
-        }
-    </style>
-</head>
-<body>
-    <div class="container mt-5">
-        <h1>Edit Document</h1>
-        <div class="mb-3">
-            <a href="{% url 'editor:list_documents' %}" class="btn btn-secondary">Back to Document List</a>
-            <a href="{% url 'editor:download_document' document.id %}" class="btn btn-success">Download Document</a>
-        </div>
-        <button onclick="applyFormat()" class="btn btn-primary mb-3">Apply Predefined Format</button>
+{% extends 'editor/base.html' %}
 
-        <div id="document-content" class="list-group">
-            {% for para in paragraphs %}
-                <a href="#" class="list-group-item list-group-item-action paragraph" data-index="{{ para.index }}">
-                    <small class="text-muted">[Style: {{ para.style }}]</small><br>
-                    {{ para.text }}
-                </a>
+{% block title %}Edit Document{% endblock %}
+
+{% block extra_css %}
+<style>
+    /* Layout styles */
+    .content-wrapper {
+        display: flex;
+        flex-wrap: nowrap;
+    }
+
+    .toc {
+        flex: 0 0 250px;
+        max-width: 250px;
+        margin-right: 20px;
+        overflow-y: auto;
+        max-height: 80vh;
+        position: sticky;
+        top: 20px;
+    }
+
+    .document-content {
+        flex: 1 1 auto;
+        overflow-y: auto;
+        max-height: 80vh;
+    }
+
+    .paragraph {
+        cursor: pointer;
+        position: relative;
+    }
+
+    .paragraph.collapsed .full-text {
+        display: none;
+    }
+
+    .paragraph .summary {
+        display: inline;
+    }
+
+    .paragraph.expanded .summary {
+        display: none;
+    }
+
+    .heading-selector {
+        display: none;
+        position: absolute;
+        top: 5px;
+        right: 5px;
+        z-index: 1000;
+        background-color: white;
+        border: 1px solid #ccc;
+        padding: 5px;
+        border-radius: 5px;
+    }
+
+    .heading-selector button {
+        margin: 2px;
+    }
+
+    /* Styling for TOC */
+    .toc h5 {
+        margin-top: 20px;
+    }
+
+    .toc ul {
+        list-style-type: none;
+        padding-left: 0;
+    }
+
+    .toc a {
+        text-decoration: none;
+        color: #0d6efd;
+    }
+
+    .toc a:hover {
+        text-decoration: underline;
+    }
+
+    /* Highlighted paragraph */
+    .highlight {
+        background-color: yellow;
+        transition: background-color 0.5s ease;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<h1>Edit Document</h1>
+<div class="mb-3">
+    <a href="{% url 'editor:download_document' document.id %}" class="btn btn-success">Download Document</a>
+    <a href="{% url 'editor:upload_document' %}" class="btn btn-primary">Upload New Document</a>
+    <a href="{% url 'editor:list_documents' %}" class="btn btn-secondary">Back to Document List</a>
+</div>
+<button onclick="applyFormat()" class="btn btn-warning mb-3">Apply Predefined Format</button>
+
+<div class="content-wrapper">
+    <!-- Table of Contents -->
+    <div class="toc">
+        <h5>Table of Contents</h5>
+        <ul class="nav flex-column">
+            {% for heading in headings %}
+                <li class="nav-item" style="margin-left: {{ heading.indent }}px;">
+                    <a class="nav-link" href="#para-{{ heading.index }}" onclick="scrollToParagraph({{ heading.index }})">
+                        H{{ heading.level }}: {{ heading.text }}
+                    </a>
+                </li>
             {% endfor %}
-        </div>
+        </ul>
+    </div>
 
-        <!-- Modal for Heading Selection -->
-        <div class="modal fade" id="headingModal" tabindex="-1" aria-labelledby="headingModalLabel" aria-hidden="true">
-            <div class="modal-dialog">
-                <div class="modal-content">
-                    <div class="modal-header">
-                        <h5 class="modal-title">Select Heading Level</h5>
-                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                    </div>
-                    <div class="modal-body">
+    <!-- Document Content -->
+    <div id="document-content" class="document-content">
+        {% for para in paragraphs %}
+            <div id="para-{{ para.index }}" class="card mb-2 paragraph collapsed" data-index="{{ para.index }}">
+                <div class="card-body">
+                    <small class="text-muted">[Style: {{ para.style }}]</small><br>
+                    <span class="summary">{{ para.text|truncatewords:10 }}</span>
+                    <span class="full-text">{{ para.text }}</span>
+                    <div class="heading-selector" data-para-index="{{ para.index }}">
+                        <button type="button" class="btn btn-outline-secondary btn-sm" onclick="setHeading('Normal', {{ para.index }})">Normal</button>
                         {% for i in "12345" %}
-                            <button type="button" class="btn btn-outline-primary mb-2" onclick="setHeading({{ i }})" data-bs-dismiss="modal">Heading {{ i }}</button><br>
+                            <button type="button" class="btn btn-outline-primary btn-sm" onclick="setHeading('Heading {{ i }}', {{ para.index }})">H{{ i }}</button>
                         {% endfor %}
                     </div>
                 </div>
             </div>
-        </div>
+        {% endfor %}
     </div>
-    <!-- Bootstrap JS and dependencies -->
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-    <script>
-        let selectedParagraphIndex = null;
+</div>
+{% endblock %}
 
-        document.addEventListener('DOMContentLoaded', function() {
-            document.querySelectorAll('.paragraph').forEach(function(element) {
-                element.addEventListener('click', function(event) {
-                    event.preventDefault();
-                    document.querySelectorAll('.paragraph').forEach(function(el) {
-                        el.classList.remove('active');
-                    });
-                    this.classList.add('active');
-                    selectedParagraphIndex = this.getAttribute('data-index');
-                    let headingModal = new bootstrap.Modal(document.getElementById('headingModal'));
-                    headingModal.show();
+{% block extra_js %}
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        // Toggle paragraph expansion and display heading selector
+        document.querySelectorAll('.paragraph').forEach(function (element) {
+            element.addEventListener('click', function (event) {
+                event.stopPropagation(); // Prevent event from bubbling up
+
+                // Toggle collapsed/expanded state
+                if (this.classList.contains('collapsed')) {
+                    this.classList.remove('collapsed');
+                    this.classList.add('expanded');
+                } else {
+                    this.classList.remove('expanded');
+                    this.classList.add('collapsed');
+                }
+
+                // Hide other heading selectors
+                document.querySelectorAll('.heading-selector').forEach(function (selector) {
+                    selector.style.display = 'none';
                 });
+
+                // Show the heading selector for this paragraph
+                let headingSelector = this.querySelector('.heading-selector');
+                headingSelector.style.display = 'block';
             });
         });
 
-        function setHeading(level) {
-            fetch('{% url "editor:update_heading" %}', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRFToken': '{{ csrf_token }}'
-                },
-                body: JSON.stringify({
-                    'doc_id': '{{ document.id }}',
-                    'para_index': selectedParagraphIndex,
-                    'heading_level': level
-                })
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.status === 'success') {
-                    location.reload();
-                } else {
-                    alert('Error updating heading.');
-                }
+        // Hide heading selectors when clicking outside
+        document.addEventListener('click', function () {
+            document.querySelectorAll('.heading-selector').forEach(function (selector) {
+                selector.style.display = 'none';
             });
-        }
+        });
+    });
 
-        function applyFormat() {
-            window.location.href = '{% url "editor:apply_format" document.id %}';
+    function setHeading(styleName, paraIndex) {
+        const csrftoken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+
+        fetch('{% url "editor:update_heading" %}', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': csrftoken
+            },
+            body: JSON.stringify({
+                'doc_id': '{{ document.id }}',
+                'para_index': paraIndex,
+                'style_name': styleName
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.status === 'success') {
+                // Reload the page and scroll to the updated paragraph
+                location.reload();
+                setTimeout(function() {
+                    scrollToParagraph(paraIndex);
+                }, 500);
+            } else {
+                alert('Error updating style: ' + data.message);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('An error occurred.');
+        });
+    }
+
+    function applyFormat() {
+        window.location.href = '{% url "editor:apply_format" document.id %}';
+    }
+
+    function scrollToParagraph(index) {
+        let paragraph = document.getElementById('para-' + index);
+        if (paragraph) {
+            paragraph.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            // Highlight the paragraph briefly
+            paragraph.classList.add('highlight');
+            setTimeout(function() {
+                paragraph.classList.remove('highlight');
+            }, 2000);
         }
-    </script>
-</body>
-</html>
+    }
+</script>
+{% endblock %}
