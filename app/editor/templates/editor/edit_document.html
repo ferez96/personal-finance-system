@@ -1,0 +1,102 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Edit Document</title>
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        /* Additional styles */
+        .paragraph {
+            cursor: pointer;
+        }
+        .selected {
+            background-color: #d3d3d3;
+        }
+    </style>
+</head>
+<body>
+    <div class="container mt-5">
+        <h1>Edit Document</h1>
+        <div class="mb-3">
+            <a href="{% url 'editor:list_documents' %}" class="btn btn-secondary">Back to Document List</a>
+            <a href="{% url 'editor:download_document' document.id %}" class="btn btn-success">Download Document</a>
+        </div>
+        <button onclick="applyFormat()" class="btn btn-primary mb-3">Apply Predefined Format</button>
+
+        <div id="document-content" class="list-group">
+            {% for para in paragraphs %}
+                <a href="#" class="list-group-item list-group-item-action paragraph" data-index="{{ para.index }}">
+                    <small class="text-muted">[Style: {{ para.style }}]</small><br>
+                    {{ para.text }}
+                </a>
+            {% endfor %}
+        </div>
+
+        <!-- Modal for Heading Selection -->
+        <div class="modal fade" id="headingModal" tabindex="-1" aria-labelledby="headingModalLabel" aria-hidden="true">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">Select Heading Level</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        {% for i in "12345" %}
+                            <button type="button" class="btn btn-outline-primary mb-2" onclick="setHeading({{ i }})" data-bs-dismiss="modal">Heading {{ i }}</button><br>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <!-- Bootstrap JS and dependencies -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        let selectedParagraphIndex = null;
+
+        document.addEventListener('DOMContentLoaded', function() {
+            document.querySelectorAll('.paragraph').forEach(function(element) {
+                element.addEventListener('click', function(event) {
+                    event.preventDefault();
+                    document.querySelectorAll('.paragraph').forEach(function(el) {
+                        el.classList.remove('active');
+                    });
+                    this.classList.add('active');
+                    selectedParagraphIndex = this.getAttribute('data-index');
+                    let headingModal = new bootstrap.Modal(document.getElementById('headingModal'));
+                    headingModal.show();
+                });
+            });
+        });
+
+        function setHeading(level) {
+            fetch('{% url "editor:update_heading" %}', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': '{{ csrf_token }}'
+                },
+                body: JSON.stringify({
+                    'doc_id': '{{ document.id }}',
+                    'para_index': selectedParagraphIndex,
+                    'heading_level': level
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    location.reload();
+                } else {
+                    alert('Error updating heading.');
+                }
+            });
+        }
+
+        function applyFormat() {
+            window.location.href = '{% url "editor:apply_format" document.id %}';
+        }
+    </script>
+</body>
+</html>
