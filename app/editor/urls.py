@@ -6,6 +6,7 @@ app_name = 'editor'
 urlpatterns = [
     path('', views.list_documents, name='list_documents'),
     path('upload/', views.upload_document, name='upload_document'),
+    path('delete/<int:doc_id>/', views.delete_document, name='delete_document'),
     path('edit/<int:doc_id>/', views.edit_document, name='edit_document'),
     path('update_heading/', views.update_heading, name='update_heading'),
     path('apply_format/<int:doc_id>/', views.apply_format, name='apply_format'),

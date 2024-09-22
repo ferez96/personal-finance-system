@@ -2,10 +2,12 @@ import json
 import os
 
 from django.conf import settings
+from django.contrib import messages
 from django.http import JsonResponse, HttpResponse
-from django.shortcuts import render, redirect
+from django.shortcuts import render, redirect, get_object_or_404
 from django.urls import reverse
 from django.views.decorators.csrf import csrf_exempt
+from django.views.decorators.http import require_POST
 from docx import Document as DocxDocument
 from docx.enum.style import WD_STYLE_TYPE
 from docx.enum.text import WD_ALIGN_PARAGRAPH
@@ -29,6 +31,26 @@ def upload_document(request):
     else:
         form = DocumentForm()
     return render(request, 'editor/upload.html', {'form': form})
+
+
+@require_POST
+def delete_document(request, doc_id):
+    doc = get_object_or_404(Document, id=doc_id)
+    if request.method == 'POST':
+        # Delete the file from the filesystem
+        file_path = os.path.join(settings.MEDIA_ROOT, doc.file.name)
+        if os.path.isfile(file_path):
+            os.remove(file_path)
+
+        # Delete the Document object from the database
+        doc.delete()
+
+        messages.success(request, 'Document deleted successfully.')
+    else:
+        # Handle GET request by performing deletion (since confirmation is done via JavaScript)
+        # Alternatively, you can require POST requests for deletion for better security
+        messages.error(request, 'Invalid request method.')
+    return redirect(reverse('editor:list_documents'))
 
 
 def edit_document(request, doc_id):
